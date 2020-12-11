@@ -244,12 +244,11 @@ bool HttpConn::read_once()
 //解析http请求行，获得请求方法，目标url及http版本号
 HttpConn::HTTP_CODE HttpConn::parse_request_line(char *text)
 {
+    //strpbrk用于在text中寻找第一次出现过 或\t的位置
     m_url = strpbrk(text, " \t");
     if (!m_url)
-    {
         return BAD_REQUEST;
-    }
-    *m_url++ = '\0';
+    *m_url++ = '\0';    //这里将搜索到的 或者\t改为\0，标记字符串结束，并将m_url向后步进
     char *method = text;
     if (strcasecmp(method, "GET") == 0)
         m_method = GET;
@@ -258,14 +257,27 @@ HttpConn::HTTP_CODE HttpConn::parse_request_line(char *text)
         m_method = POST;
         cgi = 1;
     }
+    //其余的获取方式一律不接受
+    //TODO:以后可以添加上其他方式获取的代码
     else
         return BAD_REQUEST;
+    //跳过请求方法后面可能存在的 或\t，此时m_url应该在真实的地址首
     m_url += strspn(m_url, " \t");
+    //寻找下一个 或\t，这个应该在HTTP版本号的前面，地址的后面
     m_version = strpbrk(m_url, " \t");
+    //上面事实上是进行了两步操作，将真实url提取入m_url，并且将协议版本提取入m_version
     if (!m_version)
         return BAD_REQUEST;
-    *m_version++ = '\0';
+    *m_version++ = '\0';    //同上
+    /*
+     * 为何要跳过URL先提取协议版本呢？
+     * 因为这里规定只接受HTTP/1.1协议，其余均不接受
+     * 先判断协议版本有助于提升系统响应速度
+     * 再者，判断url跳转是一件很繁琐的事情
+     */
+    //跳过url后面可能存在的 或\t，此时m_version应该在真实的协议版本
     m_version += strspn(m_version, " \t");
+    //由于协议版本后面一定是回车和换行，在之前的函数中已经被替换成\0，这里就不需要考虑了
     if (strcasecmp(m_version, "HTTP/1.1") != 0)
         return BAD_REQUEST;
     if (strncasecmp(m_url, "http://", 7) == 0)
@@ -273,19 +285,21 @@ HttpConn::HTTP_CODE HttpConn::parse_request_line(char *text)
         m_url += 7;
         m_url = strchr(m_url, '/');
     }
-
-    if (strncasecmp(m_url, "https://", 8) == 0)
+    //原来这里是if，但是一般网页不存在http://https://这种形式，存疑
+    //fixme:这里是否可能要改回if？
+    else if (strncasecmp(m_url, "https://", 8) == 0)
     {
         m_url += 8;
         m_url = strchr(m_url, '/');
     }
-
     if (!m_url || m_url[0] != '/')
         return BAD_REQUEST;
     //当url为/时，显示判断界面
     if (strlen(m_url) == 1)
         strcat(m_url, "judge.html");
+    //请求行解析完成，转为解析请求头部
     m_check_state = CHECK_STATE_HEADER;
+    //HTTP报文只解析了请求行，还有请求头部和请求数据没有解析，所以返回请求不完整码
     return NO_REQUEST;
 }
 
@@ -425,7 +439,7 @@ HttpConn::HTTP_CODE HttpConn::parse_headers(char *text)
         text += strspn(text, " \t");
     }
     else
-        LOG_WARN("oop!unknow header: %s", text);
+        LOG_WARN("oop!unknown header: %s", text);
     return NO_REQUEST;
 }
 

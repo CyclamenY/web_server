@@ -47,14 +47,19 @@ public:
     };
     enum CHECK_STATE
     {
+        //当前正在解析请求行
         CHECK_STATE_REQUESTLINE = 0,
+        //当前正在解析请求头部
         CHECK_STATE_HEADER,
+        //当前正在解析请求数据
         CHECK_STATE_CONTENT
     };
     enum HTTP_CODE
     {
+        //请求不完整
         NO_REQUEST,
         GET_REQUEST,
+        //无效请求
         BAD_REQUEST,
         NO_RESOURCE,
         FORBIDDEN_REQUEST,
@@ -64,8 +69,11 @@ public:
     };
     enum LINE_STATUS
     {
+        //本行解析完成
         LINE_OK = 0,
+        //本行解析失败
         LINE_BAD,
+        //本行解析不完整
         LINE_OPEN
     };
 
@@ -124,7 +132,7 @@ private:
     int m_start_line;       //每一行的起始位置
     char m_write_buf[WRITE_BUFFER_SIZE];
     int m_write_idx;
-    CHECK_STATE m_check_state;
+    CHECK_STATE m_check_state;  //用于指示当前正在解析的报文行的类型
     METHOD m_method;
     char m_real_file[FILENAME_LEN];
     char *m_url;

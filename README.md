@@ -1,7 +1,8 @@
 # WebServer
  一个网页服务器<br>
- 来源https://github.com/qinguoyi/TinyWebServer<br>
+ 借鉴来源 https://github.com/qinguoyi/TinyWebServer<br>
 ## 对其作了一定修改，如下：
     - 修改类名大写
     - 修改传参方式为读取配置文件
     - 完善http请求头的解析
+# 逐步完善注释中

@@ -60,7 +60,7 @@ private:
     Locker m_mutex;
     int m_close_log; //关闭日志
     //1级为全输出，2级为info以下，3级为warn以下，4级为只输出error信息
-    //int m_log_level;
+    int m_log_level;
 };
 //调试日志，正式输出必须关闭
 #define LOG_DEBUG(format, ...) if(0 == m_close_log) {Log::get_instance()->write_log(0, format, ##__VA_ARGS__); Log::get_instance()->flush();}
