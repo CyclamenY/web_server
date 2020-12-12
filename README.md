@@ -1,6 +1,6 @@
 WebServer
 ========
-        借鉴来源 :fire:[Linux下C++轻量级Web服务器](https://github.com/qinguoyi/TinyWebServer)
+* 借鉴来源:[:fire:Linux下C++轻量级Web服务器](https://github.com/qinguoyi/TinyWebServer)
 需要的东西
 --------
     - mysql数据库，并且已知一个足够权限的账户
