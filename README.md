@@ -1,7 +1,6 @@
 WebServer
 ========
- 一个网页服务器<br>
- 借鉴来源 https://github.com/qinguoyi/TinyWebServer<br>
+        借鉴来源 https://github.com/qinguoyi/TinyWebServer
 需要的东西
 --------
     - mysql数据库，并且已知一个足够权限的账户
@@ -29,4 +28,6 @@ WebServer
 需要完善的事情
 -------
 * 密文化实质上还是个幌子（因为其实只是让人看不懂，并不是真正的让人解不出密码），后续会替换算法让密码在本地加密，云端解密
-逐步完善注释中......
+
+
+        逐步完善注释中......
