@@ -58,12 +58,14 @@ public:
     {
         //请求不完整
         NO_REQUEST,
+        //请求完整
         GET_REQUEST,
         //无效请求
         BAD_REQUEST,
         NO_RESOURCE,
         FORBIDDEN_REQUEST,
         FILE_REQUEST,
+        //服务器内部错误（未知错误）
         INTERNAL_ERROR,
         CLOSED_CONNECTION
     };
@@ -135,10 +137,10 @@ private:
     CHECK_STATE m_check_state;  //用于指示当前正在解析的报文行的类型
     METHOD m_method;
     char m_real_file[FILENAME_LEN];
-    char *m_url;
+    char *m_url;    //客户端发来的请求网址（经过处理，存放的是除域名之外的网址，类似于/，/1等）
     char *m_version;
     char *m_host;
-    int m_content_length;
+    int m_content_length;   //请求数据长度，会在解析请求头部时被赋值
     bool m_linger;      //连接状态标识位
     char *m_useragent;  //浏览器类型和操作系统版本
     int m_dnt_enable;   //禁止追踪开关

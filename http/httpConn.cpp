@@ -280,23 +280,23 @@ HttpConn::HTTP_CODE HttpConn::parse_request_line(char *text)
     //由于协议版本后面一定是回车和换行，在之前的函数中已经被替换成\0，这里就不需要考虑了
     if (strcasecmp(m_version, "HTTP/1.1") != 0)
         return BAD_REQUEST;
-    if (strncasecmp(m_url, "http://", 7) == 0)
+    if (strncasecmp(m_url, "http://", sizeof("http://") - 1) == 0)
     {
-        m_url += 7;
+        m_url += sizeof("http://") - 1;
         m_url = strchr(m_url, '/');
     }
     //原来这里是if，但是一般网页不存在http://https://这种形式，存疑
     //fixme:这里是否可能要改回if？
-    else if (strncasecmp(m_url, "https://", 8) == 0)
+    else if (strncasecmp(m_url, "https://", sizeof("https://") - 1) == 0)
     {
-        m_url += 8;
+        m_url += sizeof("https://") - 1;
         m_url = strchr(m_url, '/');
     }
     if (!m_url || m_url[0] != '/')
         return BAD_REQUEST;
     //当url为/时，显示判断界面
     if (strlen(m_url) == 1)
-        strcat(m_url, "judge.html");
+        strcat(m_url, "judge.html");    //这时候的m_url里应该存放着“/judge.html”
     //请求行解析完成，转为解析请求头部
     m_check_state = CHECK_STATE_HEADER;
     //HTTP报文只解析了请求行，还有请求头部和请求数据没有解析，所以返回请求不完整码
@@ -311,6 +311,7 @@ HttpConn::HTTP_CODE HttpConn::parse_headers(char *text)
         if (m_content_length != 0)
         {
             m_check_state = CHECK_STATE_CONTENT;
+            //到这里说明请求头部解析完成，返回“请求不完整”，准备解析请求数据
             return NO_REQUEST;
         }
         return GET_REQUEST;
@@ -325,7 +326,12 @@ HttpConn::HTTP_CODE HttpConn::parse_headers(char *text)
         if (strcasecmp(text, "keep-alive") == 0)
             m_linger = true;
     }
-    //buffer长度
+    else if (strncasecmp(text, "Content-Type:", sizeof("Content-Type:") - 1) == 0)
+    {
+        text += sizeof("Content-Type:") - 1;
+        text += strspn(text, " \t");
+    }
+    //请求数据长度（注：这里的长度实际上指的是用户名和密码的长度——至少在这个程序里是这样的）
     else if (strncasecmp(text, "Content-length:", sizeof("Content-length:") - 1) == 0)
     {
         text += sizeof("Content-length:") - 1;
@@ -339,6 +345,7 @@ HttpConn::HTTP_CODE HttpConn::parse_headers(char *text)
         text += strspn(text, " \t");
         m_host = text;
     }
+    //存放着用户的操作系统、浏览器信息
     else if (strncasecmp(text, "User-Agent:", sizeof("User-Agent:") - 1) == 0)
     {
         text += sizeof("User-Agent:") - 1;
@@ -443,9 +450,12 @@ HttpConn::HTTP_CODE HttpConn::parse_headers(char *text)
     return NO_REQUEST;
 }
 
-//判断http请求是否被完整读入
+//判断http请求是否被完整读入（注意：GET是没有这一部分的，只有在POST时才会出现）
 HttpConn::HTTP_CODE HttpConn::parse_content(char *text)
 {
+    //如果总报文长度要大于等于当前字符串位置+用户名和密码的长度，说明这是正常的
+    //相等说明请求数据后面没有东西了
+    //大于说明后面可能还有换行和回车
     if (m_read_idx >= (m_content_length + m_checked_idx))
     {
         text[m_content_length] = '\0';
@@ -453,9 +463,11 @@ HttpConn::HTTP_CODE HttpConn::parse_content(char *text)
         m_string = text;
         return GET_REQUEST;
     }
+    //如果小于那就有问题了，应该是数据没有读取完，返回一个“解析不完整”
     return NO_REQUEST;
 }
 
+//处理HTTP报文的“主函数”
 HttpConn::HTTP_CODE HttpConn::process_read()
 {
     LINE_STATUS line_status = LINE_OK;
@@ -465,57 +477,67 @@ HttpConn::HTTP_CODE HttpConn::process_read()
     while ((m_check_state == CHECK_STATE_CONTENT && line_status == LINE_OK) || ((line_status = parse_line()) == LINE_OK))
     {
         text = get_line();
-        //将起始位置步进，准备解析下一行
+        //将起始位置指向下一行，准备解析下一行
         m_start_line = m_checked_idx;
+        //写一行日志（这里就是日志INFO为什么那么多的原因之一）
         LOG_INFO("%s", text);
         switch (m_check_state)
         {
-        case CHECK_STATE_REQUESTLINE:
-        {
-            ret = parse_request_line(text);
-            if (ret == BAD_REQUEST)
-                return BAD_REQUEST;
-            break;
-        }
-        case CHECK_STATE_HEADER:
-        {
-            ret = parse_headers(text);
-            if (ret == BAD_REQUEST)
-                return BAD_REQUEST;
-            else if (ret == GET_REQUEST)
-                return do_request();
-            break;
-        }
-        case CHECK_STATE_CONTENT:
-        {
-            ret = parse_content(text);
-            if (ret == GET_REQUEST)
-                return do_request();
-            line_status = LINE_OPEN;
-            break;
-        }
-        default:
-            return INTERNAL_ERROR;
+            //解析请求行
+            case CHECK_STATE_REQUESTLINE:
+            {
+                ret = parse_request_line(text);
+                if (ret == BAD_REQUEST)
+                    return BAD_REQUEST;
+                break;
+            }
+            //解析请求头部
+            case CHECK_STATE_HEADER:
+            {
+                ret = parse_headers(text);
+                if (ret == BAD_REQUEST)
+                    return BAD_REQUEST;
+                else if (ret == GET_REQUEST)
+                    return do_request();
+                break;
+            }
+            //解析请求数据
+            case CHECK_STATE_CONTENT:
+            {
+                //fixme:下面两行未经验证，随时准备剔除
+                if (m_method != POST)       //非POST请求不可能带有请求数据
+                    return BAD_REQUEST;     //必须回绝
+                ret = parse_content(text);
+                if (ret == GET_REQUEST)
+                    return do_request();
+                //请求不完整，返回一个“行解析不完整”，继续读取数据
+                line_status = LINE_OPEN;
+                break;
+            }
+            //所有的线程都不应该走到这里，返回一个未知错误
+            default:
+                return INTERNAL_ERROR;
         }
     }
     return NO_REQUEST;
 }
 
+//进入这里说明整个HTTP报文全部读取且解析完成
 HttpConn::HTTP_CODE HttpConn::do_request()
 {
+    //设置网址文件路径
     strcpy(m_real_file, doc_root);
     int len = strlen(doc_root);
     //printf("m_url:%s\n", m_url);
     const char *p = strrchr(m_url, '/');
 
-    //处理cgi
+    //处理cgi（注册或者登录）
     if (cgi == 1 && (*(p + 1) == '2' || *(p + 1) == '3'))
     {
-
         //根据标志判断是登录检测还是注册检测
         char flag = m_url[1];
 
-        char *m_url_real = (char *)malloc(sizeof(char) * 200);
+        char *m_url_real = (char *)malloc(sizeof(char) * FILENAME_LEN);
         strcpy(m_url_real, "/");
         strcat(m_url_real, m_url + 2);
         strncpy(m_real_file + len, m_url_real, FILENAME_LEN - len - 1);
@@ -523,7 +545,10 @@ HttpConn::HTTP_CODE HttpConn::do_request()
 
         //将用户名和密码提取出来
         //user=123&passwd=123
-        char name[100], password[100];
+        char name[100];
+        char password[100];
+        //inthis
+        //TODO:客户端输入后加密传给服务器，由服务器来解密得到真正的账户和密码
         int i;
         for (i = 5; m_string[i] != '&'; ++i)
             name[i - 5] = m_string[i];
