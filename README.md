@@ -5,8 +5,8 @@ WebServer
 需要的东西
 --------
 
-    - mysql数据库，并且已知一个足够权限的账户
-    - cmake与make，本项目改用cmake编译，比make文件编写要简单一些
+* mysql数据库，并且已知一个足够权限的账户
+* cmake与make，本项目改用cmake编译，比make文件编写要简单一些
 
 如何编译？
 --------
