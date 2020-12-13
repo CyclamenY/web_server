@@ -138,6 +138,7 @@ private:
     METHOD m_method;
     char m_real_file[FILENAME_LEN];
     char *m_url;    //客户端发来的请求网址（经过处理，存放的是除域名之外的网址，类似于/，/1等）
+    bool m_fakeuser;    //判断是否为人为操作跳转而入的登录或者注册
     char *m_version;
     char *m_host;
     int m_content_length;   //请求数据长度，会在解析请求头部时被赋值

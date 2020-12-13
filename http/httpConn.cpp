@@ -155,6 +155,7 @@ void HttpConn::init()
     m_state = 0;
     timer_flag = 0;
     improv = 0;
+    m_fakeuser = false;
 
     memset(m_read_buf, '\0', READ_BUFFER_SIZE);
     memset(m_write_buf, '\0', WRITE_BUFFER_SIZE);
@@ -367,14 +368,14 @@ HttpConn::HTTP_CODE HttpConn::parse_headers(char *text)
     {
         text += sizeof("DNT:") - 1;
         text += strspn(text, " \t");
-        m_dnt_enable=atoi(text);
+        m_dnt_enable = atoi(text);
     }
     //允许接收https报文标识
     else if (strncasecmp(text, "Upgrade-Insecure-Requests:", sizeof("Upgrade-Insecure-Requests:") - 1) == 0)
     {
         text += sizeof("Upgrade-Insecure-Requests:") - 1;
         text += strspn(text, " \t");
-        m_upgrade_requests=atoi(text);
+        m_upgrade_requests = atoi(text);
     }
     /* 表示一个请求发起者的来源与目标资源来源之间的关系
      * cross-site 跨域请求
@@ -406,7 +407,10 @@ HttpConn::HTTP_CODE HttpConn::parse_headers(char *text)
     {
         text += sizeof("Sec-Fetch-User:") - 1;
         text += strspn(text, " \t");
-        //TODO:增加判断代码，回绝非用户导航跳转 （事实上这段判断应该是前端代码）
+        //如果是非人为跳转进入，拒绝其访问（回绝语句在502行左右）
+        //fixme:在压力测试的时候可能要关掉
+        if (strcmp(text, "?0") == 0)
+            m_fakeuser = true;
     }
     //表示请求目的地
     else if (strncasecmp(text, "Sec-Fetch-Dest:", sizeof("Sec-Fetch-Dest:") - 1) == 0)
@@ -431,7 +435,7 @@ HttpConn::HTTP_CODE HttpConn::parse_headers(char *text)
     {
         text += sizeof("Cookie:") - 1;
         text += strspn(text, " \t");
-        m_cookie=text;
+        m_cookie = text;
     }
     //与POST配套使用，用于标识请求来自于哪个站点
     else if (strncasecmp(text, "Origin:", sizeof("Origin:") - 1) == 0)
@@ -495,7 +499,7 @@ HttpConn::HTTP_CODE HttpConn::process_read()
             case CHECK_STATE_HEADER:
             {
                 ret = parse_headers(text);
-                if (ret == BAD_REQUEST)
+                if (ret == BAD_REQUEST || m_fakeuser)
                     return BAD_REQUEST;
                 else if (ret == GET_REQUEST)
                     return do_request();
@@ -544,9 +548,9 @@ HttpConn::HTTP_CODE HttpConn::do_request()
         free(m_url_real);
 
         //将用户名和密码提取出来
-        //user=123&passwd=123
+        //user=123&password=123
         char name[100];
-        char password[100];
+        char password[1000];
         //inthis
         //TODO:客户端输入后加密传给服务器，由服务器来解密得到真正的账户和密码
         int i;

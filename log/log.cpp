@@ -80,21 +80,21 @@ void Log::write_log(int level, const char *format, ...)
     char s[16] = {0};
     switch (level)
     {
-    case 0:
-        strcpy(s, "[debug]:");
-        break;
-    case 1:
-        strcpy(s, "[info]:");
-        break;
-    case 2:
-        strcpy(s, "[warn]:");
-        break;
-    case 3:
-        strcpy(s, "[error]:");
-        break;
-    default:
-        strcpy(s, "[info]:");
-        break;
+        case 0:
+            strcpy(s, "[debug]:");
+            break;
+        case 1:
+            strcpy(s, "[info]:");
+            break;
+        case 2:
+            strcpy(s, "[warn]:");
+            break;
+        case 3:
+            strcpy(s, "[error]:");
+            break;
+        default:
+            strcpy(s, "[info]:");
+            break;
     }
     //写入一个log，对m_count++, m_split_lines最大行数
     m_mutex.lock();

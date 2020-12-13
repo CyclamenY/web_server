@@ -2,11 +2,20 @@
 <html>
 
 <head>
-    <script src="./js/safe/md5.min.js"></script>
+<!--    <script src="./js/safe/md5/md5.min.js"></script>-->
+<!--    <script>-->
+<!--        function md5passwd() {-->
+<!--            var passwd = document.getElementById("password").value;-->
+<!--            document.getElementById("password").value = md5(passwd);-->
+<!--            return true;-->
+<!--        }-->
+<!--    </script>-->
+    <script src="./js/safe/rsa/jsencrypt.min.js"></script>
     <script>
-        function md5passwd() {
-            var passwd = document.getElementById("password").value;
-            document.getElementById("password").value = md5(passwd);
+        function rsapasswd() {
+            var encrypt = new JSEncrypt();
+            encrypt.setPublicKey(document.getElementById("pubkey").value);
+            document.getElementById("password").value=encrypt.encrypt(document.getElementById("password").value);
             return true;
         }
     </script>
@@ -15,6 +24,7 @@
 </head>
 
 <body>
+    <input id="pubkey" name="pubkey" type="hidden" value="这里填公钥">
     <br />
     <br />
     <div align="center">
@@ -22,7 +32,7 @@
     </div>
     <br />
     <div class="login">
-        <form action="2CGISQL.cgi" method="post" onsubmit="return md5passwd()">
+        <form action="2CGISQL.cgi" method="post" onsubmit="return rsapasswd()">
             <div align="center"><input type="text" name="user" placeholder="用户名" required="required"></div><br />
             <div align="center"><input type="password" id="password" name="password" placeholder="登录密码" required="required"></div>
             <br />
