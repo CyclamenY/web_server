@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.15)
 project(TinyWebServer)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -pthread -lmysqlclient")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -pthread")
 
 add_executable(TinyWebServer
         main.cpp
@@ -13,3 +13,5 @@ add_executable(TinyWebServer
         string/stringFunc.cpp)
 
 target_link_libraries(TinyWebServer mysqlclient)
+find_package(OpenSSL REQUIRED)
+target_link_libraries(TinyWebServer OpenSSL::SSL)

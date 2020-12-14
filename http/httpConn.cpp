@@ -2,10 +2,10 @@
 
 #include <mysql/mysql.h>
 #include <fstream>
+#include <unordered_map>
 
 //注：在基于文本的通信协议定义时，对\r\n的使用有严格的定义，如在HTTP中，标识一行的结束，
 //必须使用\r\n
-
 
 //定义http响应的一些状态信息
 const char *ok_200_title = "OK";
@@ -550,9 +550,9 @@ HttpConn::HTTP_CODE HttpConn::do_request()
         //将用户名和密码提取出来
         //user=123&password=123
         char name[100];
-        char password[1000];
-        //inthis
-        //TODO:客户端输入后加密传给服务器，由服务器来解密得到真正的账户和密码
+        memset(name,'\0',100);
+        char password[100];
+        memset(password,'\0',100);
         int i;
         for (i = 5; m_string[i] != '&'; ++i)
             name[i - 5] = m_string[i];
@@ -560,7 +560,7 @@ HttpConn::HTTP_CODE HttpConn::do_request()
 
         int j = 0;
         for (i = i + 10; m_string[i] != '\0'; ++i, ++j)
-            password[j] = m_string[i];
+            password[j] += m_string[i];
         password[j] = '\0';
 
         if (*(p + 1) == '3')
