@@ -554,19 +554,17 @@ HttpConn::HTTP_CODE HttpConn::do_request()
         char password[100];
         memset(password,'\0',100);
         int i;
-        for (i = 5; m_string[i] != '&'; ++i)
+        for (i = 5; m_string[i] != '&'; ++i)    //i=5越过"user="
             name[i - 5] = m_string[i];
         name[i - 5] = '\0';
 
         int j = 0;
-        for (i = i + 10; m_string[i] != '\0'; ++i, ++j)
+        for (i = i + 10; m_string[i] != '\0'; ++i, ++j) //i+10越过"password="
             password[j] += m_string[i];
         password[j] = '\0';
-
+        //如果是注册，进入这个if
         if (*(p + 1) == '3')
         {
-            //如果是注册，先检测数据库中是否有重名的
-            //没有重名的，进行增加数据
             char *sql_insert = (char *)malloc(sizeof(char) * 200);
             strcpy(sql_insert, "INSERT INTO user(username, passwd) VALUES(");
             strcat(sql_insert, "'");
@@ -574,12 +572,15 @@ HttpConn::HTTP_CODE HttpConn::do_request()
             strcat(sql_insert, "', '");
             strcat(sql_insert, password);
             strcat(sql_insert, "')");
-
+            //先检查是否有重名（注意，这里是查询服务器内的一个全局map里有没有用户，而不是查询mysql）
+            //inthis
             if (users.find(name) == users.end())
             {
+                //一定要加锁，因为现在已经是并发状态了
                 m_lock.lock();
                 int res = mysql_query(mysql, sql_insert);
-                users.insert(pair<string, string>(name, password));
+                if(!res)
+                    users.insert(pair<string, string>(name, password));
                 m_lock.unlock();
 
                 if (!res)
