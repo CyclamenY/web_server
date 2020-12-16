@@ -62,8 +62,11 @@ public:
         GET_REQUEST,
         //无效请求
         BAD_REQUEST,
+        //找不到资源
         NO_RESOURCE,
+        //禁止访问
         FORBIDDEN_REQUEST,
+        //（网页）文件请求
         FILE_REQUEST,
         //服务器内部错误（未知错误）
         INTERNAL_ERROR,
@@ -120,23 +123,23 @@ private:
     bool add_blank_line();
 
 public:
-    static int m_epollfd;
+    static int m_epollfd;       //epoll事件描述符
     static int m_user_count;
     MYSQL *mysql;
     int m_state;  //读为0, 写为1
 
 private:
-    int m_sockfd;
+    int m_sockfd;               //连接描述符
     sockaddr_in m_address;
     char m_read_buf[READ_BUFFER_SIZE];      //HTTP报文字符数组（里面存了整个报文）
     int m_read_idx;         //总HTTP报文字符数
     int m_checked_idx;      //中间变量，指向当前HTTP解析字符
     int m_start_line;       //每一行的起始位置
-    char m_write_buf[WRITE_BUFFER_SIZE];
-    int m_write_idx;
+    char m_write_buf[WRITE_BUFFER_SIZE];    //返回HTTP报文字符数组
+    int m_write_idx;            //用于指向当前写入HTTP报文的位置
     CHECK_STATE m_check_state;  //用于指示当前正在解析的报文行的类型
     METHOD m_method;
-    char m_real_file[FILENAME_LEN];
+    char m_real_file[FILENAME_LEN];     //网页文件
     char *m_url;    //客户端发来的请求网址（经过处理，存放的是除域名之外的网址，类似于/，/1等）
     bool m_fakeuser;    //判断是否为人为操作跳转而入的登录或者注册
     char *m_version;
@@ -147,13 +150,13 @@ private:
     int m_dnt_enable;   //禁止追踪开关
     int m_upgrade_requests; //客户端允许接收https信息标识位
     char *m_cookie;         //cookie
-    char *m_file_address;
-    struct stat m_file_stat;
-    struct iovec m_iv[2];
-    int m_iv_count;
+    char *m_file_address;   //文件地址，这里是指文件映射到内存中的位置
+    struct stat m_file_stat;    //网页文件所使用的stat结构体
+    struct iovec m_iv[2];       //iovec结构体数组，每一个元素指向一个缓冲区
+    int m_iv_count;             //
     int cgi;        //是否启用的POST
     char *m_string; //存储请求头数据
-    int bytes_to_send;
+    int bytes_to_send;      //发送的总字节数
     int bytes_have_send;
     char *doc_root;
 

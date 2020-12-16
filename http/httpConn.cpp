@@ -2,7 +2,6 @@
 
 #include <mysql/mysql.h>
 #include <fstream>
-#include <unordered_map>
 
 //注：在基于文本的通信协议定义时，对\r\n的使用有严格的定义，如在HTTP中，标识一行的结束，
 //必须使用\r\n
@@ -100,7 +99,7 @@ int HttpConn::m_user_count = 0;
 int HttpConn::m_epollfd = -1;
 
 //关闭连接，关闭一个连接，客户总量减一
-void HttpConn::close_conn(bool real_close)
+void HttpConn::close_conn(bool real_close)  //real_close默认值为true
 {
     if (real_close && (m_sockfd != -1))
     {
@@ -501,6 +500,7 @@ HttpConn::HTTP_CODE HttpConn::process_read()
                 ret = parse_headers(text);
                 if (ret == BAD_REQUEST || m_fakeuser)
                     return BAD_REQUEST;
+                //get请求会走到这里，因为get是没有请求数据的
                 else if (ret == GET_REQUEST)
                     return do_request();
                 break;
@@ -512,6 +512,7 @@ HttpConn::HTTP_CODE HttpConn::process_read()
                 if (m_method != POST)       //非POST请求不可能带有请求数据
                     return BAD_REQUEST;     //必须回绝
                 ret = parse_content(text);
+                //post请求会走到这里
                 if (ret == GET_REQUEST)
                     return do_request();
                 //请求不完整，返回一个“行解析不完整”，继续读取数据
@@ -536,6 +537,7 @@ HttpConn::HTTP_CODE HttpConn::do_request()
     const char *p = strrchr(m_url, '/');
 
     //处理cgi（注册或者登录）
+    //这里是指是从登录界面还是注册界面跳转而入的CGI
     if (cgi == 1 && (*(p + 1) == '2' || *(p + 1) == '3'))
     {
         //根据标志判断是登录检测还是注册检测
@@ -573,12 +575,12 @@ HttpConn::HTTP_CODE HttpConn::do_request()
             strcat(sql_insert, password);
             strcat(sql_insert, "')");
             //先检查是否有重名（注意，这里是查询服务器内的一个全局map里有没有用户，而不是查询mysql）
-            //inthis
             if (users.find(name) == users.end())
             {
                 //一定要加锁，因为现在已经是并发状态了
                 m_lock.lock();
                 int res = mysql_query(mysql, sql_insert);
+                //ps:只有在注册时才执行mysql插入语句
                 if(!res)
                     users.insert(pair<string, string>(name, password));
                 m_lock.unlock();
@@ -595,67 +597,76 @@ HttpConn::HTTP_CODE HttpConn::do_request()
         //若浏览器端输入的用户名和密码在表中可以查找到，返回1，否则返回0
         else if (*(p + 1) == '2')
         {
+            //在登陆操作时只查询服务器内的全局map是否存在字段以及字段是否匹配
+            //不进行mysql查询
             if (users.find(name) != users.end() && users[name] == password)
                 strcpy(m_url, "/welcome.html");
             else
                 strcpy(m_url, "/logError.html");
         }
     }
-
+    char *m_url_real = (char *)malloc(sizeof(char) * 200);
+    //跳转入注册界面
     if (*(p + 1) == '0')
     {
-        char *m_url_real = (char *)malloc(sizeof(char) * 200);
         strcpy(m_url_real, "/register.html");
         strncpy(m_real_file + len, m_url_real, strlen(m_url_real));
-
-        free(m_url_real);
     }
+    //跳转入登陆界面
     else if (*(p + 1) == '1')
     {
-        char *m_url_real = (char *)malloc(sizeof(char) * 200);
         strcpy(m_url_real, "/log.html");
         strncpy(m_real_file + len, m_url_real, strlen(m_url_real));
-
-        free(m_url_real);
     }
+    //转入图片页
     else if (*(p + 1) == '5')
     {
-        char *m_url_real = (char *)malloc(sizeof(char) * 200);
         strcpy(m_url_real, "/picture.html");
         strncpy(m_real_file + len, m_url_real, strlen(m_url_real));
-
-        free(m_url_real);
     }
+    //转入视频页
     else if (*(p + 1) == '6')
     {
-        char *m_url_real = (char *)malloc(sizeof(char) * 200);
         strcpy(m_url_real, "/video.html");
         strncpy(m_real_file + len, m_url_real, strlen(m_url_real));
-
-        free(m_url_real);
     }
+    //转入gif页
     else if (*(p + 1) == '7')
     {
-        char *m_url_real = (char *)malloc(sizeof(char) * 200);
-        strcpy(m_url_real, "/fans.html");
+        strcpy(m_url_real, "/gif.html");
         strncpy(m_real_file + len, m_url_real, strlen(m_url_real));
-
-        free(m_url_real);
     }
+//    else
+//        strncpy(m_real_file + len, m_url, FILENAME_LEN - len - 1);
+    //其余情况跳转回首页
     else
-        strncpy(m_real_file + len, m_url, FILENAME_LEN - len - 1);
+    {
+        strcpy(m_url_real, "/judge.html");
+        strncpy(m_real_file + len, m_url_real, strlen(m_url_real));
+    }
+    free(m_url_real);
 
+    //没有找到文件，返回一个无资源错误
     if (stat(m_real_file, &m_file_stat) < 0)
         return NO_RESOURCE;
-
+    //S_IROTH表示其他用户可读取权限
+    //如果文件的读取权限与S_IROTH的与项全为0，说明该用户权限过低，无法访问，返回一个禁止访问错误
     if (!(m_file_stat.st_mode & S_IROTH))
         return FORBIDDEN_REQUEST;
-
+    //如果该“文件”是一个目录，返回一个无效请求
     if (S_ISDIR(m_file_stat.st_mode))
         return BAD_REQUEST;
 
     int fd = open(m_real_file, O_RDONLY);
-    m_file_address = (char *)mmap(0, m_file_stat.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
+    //对网页文件执行内存映射
+    //将一个普通文件映射到内存中，通常在需要对文件进行频繁读写时使用，这样用内存读写取代I/O读写，以获得较高的性能；
+    //第一参数为映射地址，nullptr表示由系统决定
+    //第二参数为长度
+    //第三参数为参数prot，PROT_READ表示映射区域可被读取
+    //第四参数为参数flags，MAP_PRIVATE表示不允许对该映射内存做任何修改
+    //第五参数为文件描述符
+    //第六参数为偏移量，表示从文件描述符的哪里开始执行映射操作
+    m_file_address = (char *)mmap(nullptr, m_file_stat.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
     close(fd);
     return FILE_REQUEST;
 }
@@ -726,11 +737,14 @@ bool HttpConn::write()
 }
 bool HttpConn::add_response(const char *format, ...)
 {
+    //太长啦~
     if (m_write_idx >= WRITE_BUFFER_SIZE)
         return false;
     va_list arg_list;
     va_start(arg_list, format);
+    //vsnprintf用于将一个可变参数格式化输出到一个字符数组
     int len = vsnprintf(m_write_buf + m_write_idx, WRITE_BUFFER_SIZE - 1 - m_write_idx, format, arg_list);
+    //太长啦~
     if (len >= (WRITE_BUFFER_SIZE - 1 - m_write_idx))
     {
         va_end(arg_list);
@@ -743,88 +757,103 @@ bool HttpConn::add_response(const char *format, ...)
 
     return true;
 }
+//返回HTTP状态行的填充
 bool HttpConn::add_status_line(int status, const char *title)
 {
     return add_response("%s %d %s\r\n", "HTTP/1.1", status, title);
 }
+//返回HTTP报文头部的填充
 bool HttpConn::add_headers(int content_len)
 {
-    return add_content_length(content_len) && add_linger() &&
-           add_blank_line();
+    return add_content_length(content_len) && add_linger() && add_blank_line();
 }
+//添加返回HTTP报文的长度
 bool HttpConn::add_content_length(int content_len)
 {
     return add_response("Content-Length:%d\r\n", content_len);
 }
+//增加返回报文类型
 bool HttpConn::add_content_type()
 {
     return add_response("Content-Type:%s\r\n", "text/html");
 }
+//在返回报文中增加连接类型
 bool HttpConn::add_linger()
 {
-    return add_response("Connection:%s\r\n", (m_linger == true) ? "keep-alive" : "close");
+    return add_response("Connection:%s\r\n", m_linger ? "keep-alive" : "close");
 }
+//增加后缀（必要！如果不加，客户端可能会把这个报丢掉导致客户端收不到信息）
 bool HttpConn::add_blank_line()
 {
     return add_response("%s", "\r\n");
 }
+//增加返回HTTP报文字符文本
 bool HttpConn::add_content(const char *content)
 {
     return add_response("%s", content);
 }
+//返回一个HTTP报文
 bool HttpConn::process_write(HTTP_CODE ret)
 {
     switch (ret)
     {
-    case INTERNAL_ERROR:
-    {
-        add_status_line(500, error_500_title);
-        add_headers(strlen(error_500_form));
-        if (!add_content(error_500_form))
-            return false;
-        break;
-    }
-    case BAD_REQUEST:
-    {
-        add_status_line(404, error_404_title);
-        add_headers(strlen(error_404_form));
-        if (!add_content(error_404_form))
-            return false;
-        break;
-    }
-    case FORBIDDEN_REQUEST:
-    {
-        add_status_line(403, error_403_title);
-        add_headers(strlen(error_403_form));
-        if (!add_content(error_403_form))
-            return false;
-        break;
-    }
-    case FILE_REQUEST:
-    {
-        add_status_line(200, ok_200_title);
-        if (m_file_stat.st_size != 0)
+        //服务器内部错误返回500
+        case INTERNAL_ERROR:
         {
-            add_headers(m_file_stat.st_size);
-            m_iv[0].iov_base = m_write_buf;
-            m_iv[0].iov_len = m_write_idx;
-            m_iv[1].iov_base = m_file_address;
-            m_iv[1].iov_len = m_file_stat.st_size;
-            m_iv_count = 2;
-            bytes_to_send = m_write_idx + m_file_stat.st_size;
-            return true;
-        }
-        else
-        {
-            const char *ok_string = "<html><body></body></html>";
-            add_headers(strlen(ok_string));
-            if (!add_content(ok_string))
+            add_status_line(500, error_500_title);
+            add_headers(strlen(error_500_form));
+            if (!add_content(error_500_form))
                 return false;
+            break;
         }
+        //无效请求返回404
+        case BAD_REQUEST:
+        {
+            add_status_line(404, error_404_title);
+            add_headers(strlen(error_404_form));
+            if (!add_content(error_404_form))
+                return false;
+            break;
+        }
+        //禁止访问返回403
+        case FORBIDDEN_REQUEST:
+        {
+            add_status_line(403, error_403_title);
+            add_headers(strlen(error_403_form));
+            if (!add_content(error_403_form))
+                return false;
+            break;
+        }
+        //访问（网页）文件返回200（正常返回）
+        case FILE_REQUEST:
+        {
+            add_status_line(200, ok_200_title);
+            if (m_file_stat.st_size != 0)
+            {
+                //m_iv在此处起到一个“类管道”的技术
+                add_headers(m_file_stat.st_size);
+                m_iv[0].iov_base = m_write_buf;
+                m_iv[0].iov_len = m_write_idx;
+                m_iv[1].iov_base = m_file_address;
+                m_iv[1].iov_len = m_file_stat.st_size;
+                m_iv_count = 2;
+                bytes_to_send = m_write_idx + m_file_stat.st_size;
+                return true;
+            }
+            //应对页面文件突然被移走的情况
+            else
+            {
+                //返回一个空页面
+                const char *ok_string = "<html><body></body></html>";
+                add_headers(strlen(ok_string));
+                if (!add_content(ok_string))
+                    return false;
+            }
+        }
+        default:
+            return false;
     }
-    default:
-        return false;
-    }
+    //404 403 500错误码会走到这里
     m_iv[0].iov_base = m_write_buf;
     m_iv[0].iov_len = m_write_idx;
     m_iv_count = 1;
@@ -833,16 +862,22 @@ bool HttpConn::process_write(HTTP_CODE ret)
 }
 void HttpConn::process()
 {
+    //这里处理一条HTTP请求
     HTTP_CODE read_ret = process_read();
     if (read_ret == NO_REQUEST)
     {
+        //如果这个socket信息不完整，说明一会儿这个socket还会有数据来
+        //重置epolloneshot让其他线程处理即可
+        //modfd是自定函数，并非系统函数
         modfd(m_epollfd, m_sockfd, EPOLLIN, m_TRIGMode);
         return;
     }
     bool write_ret = process_write(read_ret);
+    //只要在上面返回的false都会导致这个连接的关闭
     if (!write_ret)
-    {
+        //注意，这是有重载函数的
         close_conn();
-    }
+    //将该epoll事件标记为可触发，使得其他线程可以接手这个epoll事件
     modfd(m_epollfd, m_sockfd, EPOLLOUT, m_TRIGMode);
+    //inthis
 }
