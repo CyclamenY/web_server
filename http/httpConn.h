@@ -87,7 +87,8 @@ public:
     ~HttpConn() {}
 
 public:
-    void init(int sockfd, const sockaddr_in &addr, char *, int, int, string user, string passwd, string sqlname);
+    void init(int sockfd, const sockaddr_in &addr, char *,
+              int, int, int, string user, string passwd, string sqlname);
     void close_conn(bool real_close = true);
     void process();
     bool read_once();
@@ -97,8 +98,8 @@ public:
         return &m_address;
     }
     void initmysql_result(ConnectionPool *connPool);
-    int timer_flag;
-    int improv;
+    int timer_flag; //定时器超时标识
+    int improv;     //完成读取或者写入，处于准备处理状态
 
 
 private:
@@ -124,9 +125,9 @@ private:
 
 public:
     static int m_epollfd;       //epoll事件描述符
-    static int m_user_count;
+    static int m_user_count;    //当前连接用户总数
     MYSQL *mysql;
-    int m_state;  //读为0, 写为1
+    int m_state;  //读写标识位，读为0, 写为1
 
 private:
     int m_sockfd;               //连接描述符
@@ -152,17 +153,18 @@ private:
     char *m_cookie;         //cookie
     char *m_file_address;   //文件地址，这里是指文件映射到内存中的位置
     struct stat m_file_stat;    //网页文件所使用的stat结构体
-    struct iovec m_iv[2];       //iovec结构体数组，每一个元素指向一个缓冲区
-    int m_iv_count;             //
+    struct iovec m_iv[2];       //iovec结构体数组，每一个元素指向一个缓冲区，在这里0元素指内存，1代表文件本身
+    int m_iv_count;             //表示m_iv里有多少个元素，在writev函数中需要用到
     int cgi;        //是否启用的POST
     char *m_string; //存储请求头数据
     int bytes_to_send;      //发送的总字节数
-    int bytes_have_send;
+    int bytes_have_send;    //当前“已经”发送的字节数
     char *doc_root;
 
     map<string, string> m_users;
     int m_TRIGMode;
-    int m_close_log;
+    int m_close_log;    //日志开关
+    int m_log_level;    //日志等级
 
     char sql_user[100];
     char sql_passwd[100];

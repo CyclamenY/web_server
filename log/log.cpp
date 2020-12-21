@@ -17,12 +17,10 @@ Log::Log()
 Log::~Log()
 {
     if (m_fp != NULL)
-    {
         fclose(m_fp);
-    }
 }
 //异步需要设置阻塞队列的长度，同步不需要设置
-bool Log::init(const char *file_name, int close_log, int log_buf_size, int split_lines, int max_queue_size)
+bool Log::init(const char *file_name, int close_log, int log_level, int log_buf_size, int split_lines, int max_queue_size)
 {
     //如果设置了max_queue_size,则设置为异步
     if (max_queue_size >= 1)
@@ -33,7 +31,14 @@ bool Log::init(const char *file_name, int close_log, int log_buf_size, int split
         //flush_log_thread为回调函数,这里表示创建线程异步写日志
         pthread_create(&tid, NULL, flush_log_thread, NULL);
     }
-    
+
+    //判断日志等级不要越界
+    if (log_level > 4)
+        m_log_level = 4;
+    else if (log_level < 1)
+        m_log_level = 1;
+    else
+        m_log_level = log_level;
     m_close_log = close_log;
     m_log_buf_size = log_buf_size;
     m_buf = new char[m_log_buf_size];

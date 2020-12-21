@@ -42,6 +42,7 @@ public:
     UtilTimer() : prev(NULL), next(NULL) {}
 
 public:
+    //过期时间
     time_t expire;
     //回调函数
     void (* cb_func)(ClientData *);
@@ -67,8 +68,8 @@ public:
 private:
     void add_timer(UtilTimer *timer, UtilTimer *lst_head);
 
-    UtilTimer *head;
-    UtilTimer *tail;
+    UtilTimer *head;    //链表头
+    UtilTimer *tail;    //链表尾
 };
 
 class Utils

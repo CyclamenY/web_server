@@ -110,7 +110,7 @@ void ThreadPool<T>::run()
 {
     while (true)
     {
-        //所有的子线程会在wait这里卡住，直到拿到互斥锁
+        //所有的子线程会在wait这里卡住，直到被某个到来的http报文唤醒
         m_queuestat.wait();
         m_queuelocker.lock();
         if (m_workqueue.empty())
@@ -127,11 +127,13 @@ void ThreadPool<T>::run()
             continue;
         if (1 == m_actor_model)
         {
+            //如果是0，说明这次数据是读取
             if (0 == request->m_state)
             {
+                //循环读取数据（httpconn.cpp第205行）
                 if (request->read_once())
                 {
-                    request->improv = 1;    //这个标识位是用来干嘛的？
+                    request->improv = 1;    //这个标识位是用来干嘛的？先假定是用来标记已经完成一个读/写，并且正处于准备处理的状态
                     ConnectionRAII mysqlcon(&request->mysql, m_connPool);
                     request->process();
                 }
@@ -141,12 +143,11 @@ void ThreadPool<T>::run()
                     request->timer_flag = 1;
                 }
             }
+            //反之是写入
             else
             {
                 if (request->write())
-                {
                     request->improv = 1;
-                }
                 else
                 {
                     request->improv = 1;

@@ -8,10 +8,9 @@ int main(int argc, char *argv[])
     config.parse_arg();
 
     WebServer server;
-
     //初始化
     server.init(config.PORT, config.user, config.passwd, config.databasename, config.LOGWrite,
-                config.OPT_LINGER, config.TRIGMode,  config.sql_num,  config.thread_num, 
+                config.LOGLevel,config.OPT_LINGER, config.TRIGMode,  config.sql_num, config.thread_num,
                 config.close_log, config.actor_model, config.sqlurl ,config.SQLPORT);
 
     //日志

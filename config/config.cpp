@@ -3,25 +3,27 @@
 void Config::parse_arg()
 {
     //端口号,默认9006
-    PORT = GetIntDefault("PORT",9006);
+    PORT = GetIntDefault("PORT", 9006);
     //日志写入方式，默认同步
-    LOGWrite = GetIntDefault("LOGWrite",0);
+    LOGWrite = GetIntDefault("LOGWrite", 0);
+    //日志等级，默认1级，全输出
+    LOGLevel = GetIntDefault("LOGLevel", 1);
     //触发组合模式,默认listenfd LT + connfd LT
-    TRIGMode = GetIntDefault("TRIGMode",0);
+    TRIGMode = GetIntDefault("TRIGMode", 0);
     //优雅关闭链接，默认不使用
-    OPT_LINGER = GetIntDefault("OPT_LINGER",0);
+    OPT_LINGER = GetIntDefault("OPT_LINGER", 0);
     //数据库连接池数量,默认8
-    sql_num = GetIntDefault("sql_num",8);
+    sql_num = GetIntDefault("sql_num", 8);
     //线程池内的线程数量,默认8
-    thread_num = GetIntDefault("thread_num",8);
+    thread_num = GetIntDefault("thread_num", 8);
     //关闭日志,默认不关闭
-    close_log = GetIntDefault("close_log",0);
+    close_log = GetIntDefault("close_log", 0);
     //并发模型,默认是proactor
-    actor_model = GetIntDefault("actor_model",0);
+    actor_model = GetIntDefault("actor_model", 0);
     //配置数据库地址
     sqlurl = GetString("sqlurl");
     //配置数据库端口
-    SQLPORT = GetIntDefault("SQLPORT",3306);
+    SQLPORT = GetIntDefault("SQLPORT", 3306);
     //配置数据库名
     databasename = GetString("databasename");
     //配置数据库用户名

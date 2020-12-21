@@ -23,7 +23,8 @@ ConnectionPool *ConnectionPool::GetInstance()
 }
 
 //构造初始化
-void ConnectionPool::init(string url, string User, string PassWord, string DBName, int Port, int MaxConn, int close_log)
+void ConnectionPool::init(string url, string User, string PassWord, string DBName,
+                          int Port, int MaxConn, int close_log ,int log_level)
 {
 	m_url = url;
 	m_Port = Port;
@@ -31,6 +32,7 @@ void ConnectionPool::init(string url, string User, string PassWord, string DBNam
 	m_PassWord = PassWord;
 	m_DatabaseName = DBName;
 	m_close_log = close_log;
+	m_log_level = log_level;
 
 	//创建连接池
 	for (int i = 0; i < MaxConn; i++)
@@ -40,14 +42,14 @@ void ConnectionPool::init(string url, string User, string PassWord, string DBNam
 
 		if (con == NULL)
 		{
-			LOG_ERROR("MySQL Init Error");
+		    LOG_ERROR("MySQL Init Error");
 			exit(1);
 		}
 		con = mysql_real_connect(con, url.c_str(), User.c_str(), PassWord.c_str(), DBName.c_str(), Port, NULL, 0);
 
 		if (con == NULL)
 		{
-			LOG_ERROR("MySQL Login Error");
+		    LOG_ERROR("MySQL Login Error");
 			exit(1);
 		}
 		connList.push_back(con);

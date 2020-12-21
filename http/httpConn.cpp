@@ -2,6 +2,7 @@
 
 #include <mysql/mysql.h>
 #include <fstream>
+#include "../log/log.h"
 
 //注：在基于文本的通信协议定义时，对\r\n的使用有严格的定义，如在HTTP中，标识一行的结束，
 //必须使用\r\n
@@ -86,7 +87,8 @@ void modfd(int epollfd, int fd, int ev, int TRIGMode)
 {
     epoll_event event;
     event.data.fd = fd;
-
+    //注：EPOLLRDHUP表示一种对端关闭连接的事件
+    //   EPOLLONESHOT表示该事件只会由一个线程来处理
     if (1 == TRIGMode)
         event.events = ev | EPOLLET | EPOLLONESHOT | EPOLLRDHUP;
     else
@@ -112,11 +114,12 @@ void HttpConn::close_conn(bool real_close)  //real_close默认值为true
 
 //初始化连接,外部调用初始化套接字地址
 void HttpConn::init(int sockfd, const sockaddr_in &addr, char *root, int TRIGMode,
-                     int close_log, string user, string passwd, string sqlname)
+                     int close_log, int log_level, string user, string passwd, string sqlname)
 {
     m_sockfd = sockfd;
     m_address = addr;
 
+    //这个地方将socket设置为了epolloneshot
     addfd(m_epollfd, sockfd, true, m_TRIGMode);
     m_user_count++;
 
@@ -124,6 +127,7 @@ void HttpConn::init(int sockfd, const sockaddr_in &addr, char *root, int TRIGMod
     doc_root = root;
     m_TRIGMode = TRIGMode;
     m_close_log = close_log;
+    m_log_level = log_level;
 
     strcpy(sql_user, user.c_str());
     strcpy(sql_passwd, passwd.c_str());
@@ -204,9 +208,7 @@ HttpConn::LINE_STATUS HttpConn::parse_line()
 bool HttpConn::read_once()
 {
     if (m_read_idx >= READ_BUFFER_SIZE)
-    {
         return false;
-    }
     int bytes_read = 0;
 
     //LT读取数据，电平触发，允许一次读取部分数据
@@ -636,14 +638,8 @@ HttpConn::HTTP_CODE HttpConn::do_request()
         strcpy(m_url_real, "/gif.html");
         strncpy(m_real_file + len, m_url_real, strlen(m_url_real));
     }
-//    else
-//        strncpy(m_real_file + len, m_url, FILENAME_LEN - len - 1);
-    //其余情况跳转回首页
     else
-    {
-        strcpy(m_url_real, "/judge.html");
-        strncpy(m_real_file + len, m_url_real, strlen(m_url_real));
-    }
+        strncpy(m_real_file + len, m_url, FILENAME_LEN - len - 1);
     free(m_url_real);
 
     //没有找到文件，返回一个无资源错误
@@ -672,6 +668,7 @@ HttpConn::HTTP_CODE HttpConn::do_request()
 }
 void HttpConn::unmap()
 {
+    //先判断内存映射是否存在
     if (m_file_address)
     {
         munmap(m_file_address, m_file_stat.st_size);
@@ -680,8 +677,7 @@ void HttpConn::unmap()
 }
 bool HttpConn::write()
 {
-    int temp = 0;
-
+    //这里是处理新连接进入
     if (bytes_to_send == 0)
     {
         modfd(m_epollfd, m_sockfd, EPOLLIN, m_TRIGMode);
@@ -689,50 +685,59 @@ bool HttpConn::write()
         return true;
     }
 
+    int temp = 0;
     while (1)
     {
+        //向socket中写入m_iv中的数据（m_iv里的数据在之前的函数中已被填好，是需要返回的网页文件）
         temp = writev(m_sockfd, m_iv, m_iv_count);
 
+        //写入字节数小于0，那肯定是有问题的
         if (temp < 0)
         {
+            //如果是EAGAIN错误，那么说明应该是读取到了文件尾，正常退出即可
             if (errno == EAGAIN)
             {
                 modfd(m_epollfd, m_sockfd, EPOLLOUT, m_TRIGMode);
                 return true;
             }
+            //如果是其他错误，那么解除内存映射，返回一个错误
             unmap();
             return false;
         }
 
         bytes_have_send += temp;
         bytes_to_send -= temp;
+        //这里是内存映射的大小要小于整个文件的大小
+        //这里我们需要以当前位置开始重新映射
         if (bytes_have_send >= m_iv[0].iov_len)
         {
             m_iv[0].iov_len = 0;
             m_iv[1].iov_base = m_file_address + (bytes_have_send - m_write_idx);
             m_iv[1].iov_len = bytes_to_send;
         }
+        //没有超过，那正常步进即可
         else
         {
             m_iv[0].iov_base = m_write_buf + bytes_have_send;
-            m_iv[0].iov_len = m_iv[0].iov_len - bytes_have_send;
+            m_iv[0].iov_len -=  bytes_have_send;
         }
 
+        //这里是已经没有数据需要发送了
         if (bytes_to_send <= 0)
         {
             unmap();
             modfd(m_epollfd, m_sockfd, EPOLLIN, m_TRIGMode);
 
+            //如果保持连接标识为真，说明之后还有信息来，重新刷写一遍基础数据
             if (m_linger)
             {
                 init();
                 return true;
             }
             else
-            {
                 return false;
-            }
         }
+        //inthis
     }
 }
 bool HttpConn::add_response(const char *format, ...)
@@ -752,7 +757,6 @@ bool HttpConn::add_response(const char *format, ...)
     }
     m_write_idx += len;
     va_end(arg_list);
-
     LOG_INFO("request:%s", m_write_buf);
 
     return true;
@@ -860,6 +864,7 @@ bool HttpConn::process_write(HTTP_CODE ret)
     bytes_to_send = m_write_idx;
     return true;
 }
+//http请求入口函数
 void HttpConn::process()
 {
     //这里处理一条HTTP请求
@@ -879,5 +884,4 @@ void HttpConn::process()
         close_conn();
     //将该epoll事件标记为可触发，使得其他线程可以接手这个epoll事件
     modfd(m_epollfd, m_sockfd, EPOLLOUT, m_TRIGMode);
-    //inthis
 }

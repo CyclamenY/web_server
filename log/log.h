@@ -25,7 +25,7 @@ public:
         Log::get_instance()->async_write_log();
     }
     //可选择的参数有日志文件、日志缓冲区大小、最大行数以及最长日志条队列
-    bool init(const char *file_name, int close_log, int log_buf_size = 8192, int split_lines = 5000000, int max_queue_size = 0);
+    bool init(const char *file_name, int close_log, int log_level, int log_buf_size = 8192, int split_lines = 5000000, int max_queue_size = 0);
 
     void write_log(int level, const char *format, ...);
 
@@ -63,12 +63,12 @@ private:
     int m_log_level;
 };
 //调试日志，正式输出必须关闭
-#define LOG_DEBUG(format, ...) if(0 == m_close_log) {Log::get_instance()->write_log(0, format, ##__VA_ARGS__); Log::get_instance()->flush();}
+#define LOG_DEBUG(format, ...) if(!m_close_log && m_log_level < 2) {Log::get_instance()->write_log(0, format, ##__VA_ARGS__); Log::get_instance()->flush();}
 //消息日志，视情况关闭
-#define LOG_INFO(format, ...) if(0 == m_close_log) {Log::get_instance()->write_log(1, format, ##__VA_ARGS__); Log::get_instance()->flush();}
+#define LOG_INFO(format, ...) if(!m_close_log && m_log_level < 3) {Log::get_instance()->write_log(1, format, ##__VA_ARGS__); Log::get_instance()->flush();}
 //警告日志，日志中输出后必须尽快处理
-#define LOG_WARN(format, ...) if(0 == m_close_log) {Log::get_instance()->write_log(2, format, ##__VA_ARGS__); Log::get_instance()->flush();}
+#define LOG_WARN(format, ...) if(!m_close_log && m_log_level < 4) {Log::get_instance()->write_log(2, format, ##__VA_ARGS__); Log::get_instance()->flush();}
 //错误日志，出现后必须关闭整个服务器
-#define LOG_ERROR(format, ...) if(0 == m_close_log) {Log::get_instance()->write_log(3, format, ##__VA_ARGS__); Log::get_instance()->flush();}
+#define LOG_ERROR(format, ...) if(!m_close_log && m_log_level < 5) {Log::get_instance()->write_log(3, format, ##__VA_ARGS__); Log::get_instance()->flush();}
 
 #endif

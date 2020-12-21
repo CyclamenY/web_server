@@ -38,6 +38,9 @@ public:
     //日志写入方式
     int LOGWrite;
 
+    //日志等级
+    int LOGLevel;
+
     //触发组合模式
     int TRIGMode;
 
@@ -72,6 +75,7 @@ public:
     string  databasename;
 
     std::vector<LPConfItem> m_ConfigItemList; //存储配置信息的列表
+    #define __INFO_FLAG__
 };
 
 #endif

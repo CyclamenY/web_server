@@ -20,14 +20,14 @@ SortTimerList::~SortTimerList()
 void SortTimerList::add_timer(UtilTimer *timer)
 {
     if (!timer)
-    {
         return;
-    }
     if (!head)
     {
+        //如果timerlist里是空的，那么把新放进去的设置为头尾
         head = tail = timer;
         return;
     }
+    //链表插头操作
     if (timer->expire < head->expire)
     {
         timer->next = head;
@@ -35,24 +35,25 @@ void SortTimerList::add_timer(UtilTimer *timer)
         head = timer;
         return;
     }
+    //链表正常插入
     add_timer(timer, head);
 }
 void SortTimerList::adjust_timer(UtilTimer *timer)
 {
     if (!timer)
-    {
         return;
-    }
     UtilTimer *tmp = timer->next;
+    //如果该定时器已经是最后一个或者下一个定时器的超时时间还是比该定时器大，说明不需要调整，直接返回
     if (!tmp || (timer->expire < tmp->expire))
-    {
         return;
-    }
+    //调整链表头部
     if (timer == head)
     {
+        //先删掉这个头部
         head = head->next;
         head->prev = NULL;
         timer->next = NULL;
+        //再加上去新的（已经经过调整后的）头部
         add_timer(timer, head);
     }
     else
@@ -64,10 +65,10 @@ void SortTimerList::adjust_timer(UtilTimer *timer)
 }
 void SortTimerList::del_timer(UtilTimer *timer)
 {
+    //链表为空的情况
     if (!timer)
-    {
         return;
-    }
+    //链表只有这一个元素的情况
     if ((timer == head) && (timer == tail))
     {
         delete timer;
@@ -75,6 +76,7 @@ void SortTimerList::del_timer(UtilTimer *timer)
         tail = NULL;
         return;
     }
+    //需要删除链表头
     if (timer == head)
     {
         head = head->next;
@@ -82,6 +84,7 @@ void SortTimerList::del_timer(UtilTimer *timer)
         delete timer;
         return;
     }
+    //需要删除链表尾
     if (timer == tail)
     {
         tail = tail->prev;
@@ -119,6 +122,7 @@ void SortTimerList::tick()
     }
 }
 
+//在顺序处插入定时器
 void SortTimerList::add_timer(UtilTimer *timer, UtilTimer *lst_head)
 {
     UtilTimer *prev = lst_head;
@@ -136,6 +140,7 @@ void SortTimerList::add_timer(UtilTimer *timer, UtilTimer *lst_head)
         prev = tmp;
         tmp = tmp->next;
     }
+    //链表插尾操作
     if (!tmp)
     {
         prev->next = timer;
@@ -207,6 +212,7 @@ void Utils::timer_handler()
 
 void Utils::show_error(int connfd, const char *info)
 {
+    //给对面的客户端塞一个错误代码，并关闭这个连接
     send(connfd, info, strlen(info), 0);
     close(connfd);
 }
@@ -215,6 +221,8 @@ int *Utils::u_pipefd = 0;
 int Utils::u_epollfd = 0;
 
 class Utils;
+
+//定时器回调函数，用于处理关闭一个用户的连接
 void cb_func(ClientData *user_data)
 {
     epoll_ctl(Utils::u_epollfd, EPOLL_CTL_DEL, user_data->sockfd, 0);

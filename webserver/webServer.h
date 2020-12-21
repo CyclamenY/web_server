@@ -20,7 +20,7 @@
 
 const int MAX_FD = 65536;           //最大文件描述符
 const int MAX_EVENT_NUMBER = 10000; //最大事件数
-const int TIMESLOT = 5;             //最小超时单位
+const int TIMESLOT = 5;             //最小超时单位时间（单位是小时）
 
 class WebServer
 {
@@ -29,7 +29,7 @@ public:
     ~WebServer();
     //初始化配置函数
     void init(int port , string user, string passWord, string databaseName,
-              int log_write , int opt_linger, int trigmode, int sql_num,
+              int log_write , int log_level, int opt_linger, int trigmode, int sql_num,
               int thread_num, int close_log, int actor_model, string sqlurl, int sqlport);
 
     void thread_pool();
@@ -51,6 +51,7 @@ public:
     int m_port;
     char *m_root;
     int m_log_write;
+    int m_log_level;
     int m_close_log;
     int m_actormodel;       //构建模型
 
