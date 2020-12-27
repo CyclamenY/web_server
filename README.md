@@ -4,8 +4,8 @@ WebServer
 
 两种版本
 --------
-* [Release](https://github.com/CyclamenY/web_server/blob/main/Release/README.md)版本为正式版，这个版本没有新特性，但是稳定，通过了长期测试(大概)
-* [Experiment](https://github.com/CyclamenY/web_server/blob/main/Experiment/README.md)版本为实验版，这个版本有新特性，但是未经测试或者未经长期测试
+* [Release](https://github.com/CyclamenY/web_server/blob/main/Release/)版本为正式版，这个版本没有新特性，但是稳定，通过了长期测试(大概)
+* [Experiment](https://github.com/CyclamenY/web_server/blob/main/Experiment/)版本为实验版，这个版本有新特性，但是未经测试或者未经长期测试
 
 需要的东西
 --------
