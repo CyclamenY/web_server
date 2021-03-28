@@ -28,8 +28,8 @@ public:
     WebServer();
     ~WebServer();
     //初始化配置函数
-    void init(int port , string user, string passWord, string databaseName,
-              int log_write , int log_level, int opt_linger, int trigmode, int sql_num,
+    void init(int port , string user, string passWord, string databaseName, int log_write,
+              int log_level, int opt_linger, int trigmode, int clear_day, int sql_num,
               int thread_num, int close_log, int actor_model, string sqlurl, int sqlport);
 
     void thread_pool();
@@ -54,6 +54,7 @@ public:
     int m_log_level;
     int m_close_log;
     int m_actormodel;       //构建模型
+    int m_clear_day;        //日志保留时期
 
     int m_pipefd[2];
     int m_epollfd;
@@ -62,7 +63,7 @@ public:
     //数据库相关
     ConnectionPool *m_connPool; //数据库连接池
     string m_sqlurl;            //数据库地址
-    int m_sqlport;                //数据库端口
+    int m_sqlport;              //数据库端口
     string m_user;              //登陆数据库用户名
     string m_passWord;          //登陆数据库密码
     string m_databaseName;      //使用数据库名

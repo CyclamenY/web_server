@@ -30,8 +30,8 @@ WebServer::~WebServer()
     delete m_pool;
 }
 
-void WebServer::init(int port, string user, string passWord, string databaseName,
-                     int log_write, int log_level, int opt_linger, int trigmode, int sql_num,
+void WebServer::init(int port, string user, string passWord, string databaseName, int log_write,
+                     int log_level, int opt_linger, int trigmode, int clear_day, int sql_num,
                      int thread_num, int close_log, int actor_model, string sqlurl, int sqlport)
 {
     m_port = port;
@@ -48,6 +48,7 @@ void WebServer::init(int port, string user, string passWord, string databaseName
     m_TRIGMode = trigmode;
     m_close_log = close_log;
     m_actormodel = actor_model;
+    m_clear_day = clear_day;
 }
 
 void WebServer::trig_mode()
@@ -69,7 +70,7 @@ void WebServer::log_write()
         }
         //根据配置文件中写入日志方式的不同，初始化日志
         Log::get_instance()->init("./Log/ServerLog.log", m_close_log, m_log_level,
-                                  2000, 800000,
+                                  m_clear_day,2000, 800000,
                                   1 == m_log_write ? 800 : 0);
     }
 }
@@ -82,6 +83,7 @@ void WebServer::sql_pool()
                      m_sqlport, m_sql_num, m_close_log ,m_log_level);
 
     //初始化数据库读取表，读取所有注册过的用户
+    //在程序开始前就将所有用户名读出，避免后续SQL查询
     users->initmysql_result(m_connPool);
 }
 

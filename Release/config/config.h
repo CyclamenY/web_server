@@ -59,6 +59,9 @@ public:
     //并发模型选择
     int actor_model;
 
+    //日志保留期限
+    int clear_day;
+
     //数据库地址
     string sqlurl;
 

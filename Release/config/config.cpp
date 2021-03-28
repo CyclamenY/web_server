@@ -20,6 +20,8 @@ void Config::parse_arg()
     close_log = GetIntDefault("close_log", 0);
     //并发模型,默认是proactor
     actor_model = GetIntDefault("actor_model", 0);
+    //日志保留期限
+    clear_day = GetIntDefault("CLEAR_DAY", 15);
     //配置数据库地址
     sqlurl = GetString("sqlurl");
     //配置数据库端口

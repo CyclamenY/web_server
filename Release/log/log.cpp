@@ -4,9 +4,14 @@
 #include <stdarg.h>
 #include "log.h"
 #include <pthread.h>
+#include <dirent.h>
+#include <unordered_map>
 
 using namespace std;
 
+unordered_map<int,int> monthday={{1,31},{2,28},{3,31},{4,30},
+                                 {5,31},{6,30},{7,31},{8,31},
+                                 {9,30},{10,31},{11,30},{12,31}};
 
 Log::Log()
 {
@@ -20,7 +25,8 @@ Log::~Log()
         fclose(m_fp);
 }
 //异步需要设置阻塞队列的长度，同步不需要设置
-bool Log::init(const char *file_name, int close_log, int log_level, int log_buf_size, int split_lines, int max_queue_size)
+bool Log::init(const char *file_name, int close_log, int log_level, int clear_day,
+               int log_buf_size, int split_lines, int max_queue_size)
 {
     //如果设置了max_queue_size,则设置为异步
     if (max_queue_size >= 1)
@@ -31,7 +37,6 @@ bool Log::init(const char *file_name, int close_log, int log_level, int log_buf_
         //flush_log_thread为回调函数,这里表示创建线程异步写日志
         pthread_create(&tid, NULL, flush_log_thread, NULL);
     }
-
     //判断日志等级不要越界
     if (log_level > 4)
         m_log_level = 4;
@@ -40,6 +45,7 @@ bool Log::init(const char *file_name, int close_log, int log_level, int log_buf_
     else
         m_log_level = log_level;
     m_close_log = close_log;
+    m_clear_day = clear_day;
     m_log_buf_size = log_buf_size;
     m_buf = new char[m_log_buf_size];
     memset(m_buf, '\0', m_log_buf_size);
@@ -68,7 +74,8 @@ bool Log::init(const char *file_name, int close_log, int log_level, int log_buf_
     }
 
     m_today = my_tm.tm_mday;
-    
+    m_month = my_tm.tm_mon + 1;
+    m_year = my_tm.tm_year + 1900;
     m_fp = fopen(log_full_name, "a");
     if (m_fp == NULL)
         return false;
@@ -98,7 +105,7 @@ void Log::write_log(int level, const char *format, ...)
             strcpy(s, "[error]:");
             break;
         default:
-            strcpy(s, "[info]:");
+            strcpy(s, "[warn]:");
             break;
     }
     //写入一个log，对m_count++, m_split_lines最大行数
@@ -118,7 +125,16 @@ void Log::write_log(int level, const char *format, ...)
         {
             snprintf(new_log, 255, "%s%s%s", dir_name, tail, log_name);
             m_today = my_tm.tm_mday;
+            m_month = my_tm.tm_mon + 1;
+            m_year = my_tm.tm_year + 1900;
             m_count = 0;
+
+            //创建删除日志子线程
+            pthread_t tid;
+            //新加线程未经验证，随时删除
+            pthread_create(&tid, NULL, clear_log_file_enter, this);
+            //给他一个detach标签，执行完了让它自己销毁吧
+            pthread_detach(tid);
         }
         //这里是文件写满
         else
@@ -166,4 +182,89 @@ void Log::flush(void)
     //强制刷新写入流缓冲区
     fflush(m_fp);
     m_mutex.unlock();
+}
+
+void* Log::clear_log_file_enter(void* arg)
+{
+    Log *log = (Log *)arg;
+    log->clear_log_file();
+    return log;
+}
+
+void Log::clear_log_file()
+{
+    //日期递减判断
+    int temp_year = m_year;
+    int temp_month = m_month;
+    int temp_day = m_today - m_clear_day;
+    //如果日需要退位
+    if (temp_day < 1)
+    {
+        if (temp_month - 1 == 2)   //二月情况
+        {
+            temp_month = 2;
+            //闰年情况
+            if ((temp_year % 4 == 0 && temp_year % 100 != 0) || temp_year % 400 == 0)
+                temp_day += 29;
+            //非闰年情况
+            else
+                temp_day += 28;
+        }
+        //非二月且没有退位情况
+        else if (temp_month - 1 > 0)
+            temp_day += monthday[--temp_month];
+        //年退位
+        else
+        {
+            temp_year -= 1;
+            temp_month = 12;
+            temp_day += 31;
+        }
+    }
+    //基准时间
+    string std_time = to_string(temp_year) + '_';
+    if (temp_month < 10)
+        std_time += ('0' + to_string(temp_month) + '_');
+    else
+        std_time += (to_string(temp_month) + '_');
+    if (temp_day < 10)
+        std_time += ('0' + to_string(temp_day));
+    else
+        std_time += to_string(temp_day);
+
+    DIR *dir;
+    struct dirent *ptr;
+    if ((dir = opendir(dir_name)) == nullptr)
+    {
+        //按道理这里不应该会打不开文件夹，如果出现了姑且让它写个日志后直接返回吧
+        LOG_ERROR("open dir failed!");
+        printf("open dir failed!");
+        return;
+    }
+    while ((ptr = readdir(dir)))
+    {
+        //这个if处理本目录和上级目录，不管
+        if(strcmp(ptr->d_name,".") == 0 || strcmp(ptr->d_name,"..") == 0)
+            continue;
+        else if (ptr->d_type == 8)  // = 8表示这是一个文件
+        {
+            //文件时间
+            string file_time(ptr->d_name, 10);
+            if (file_time <= std_time)
+            {
+                char* file_url = new char[100];
+                memset(file_url, '\0', 100);
+                strncpy(file_url, dir_name,strlen(dir_name));
+                strncpy(file_url + strlen(dir_name), ptr->d_name, strlen(ptr->d_name));
+                if(remove(file_url) == -1)
+                {
+                    auto errn = errno;
+                    LOG_ERROR("errno occurs! errno. is ",errn);
+                    printf("errno occurs! errno. is %d",errn);
+                }
+                delete[] file_url;
+            }
+        }
+    }
+    closedir(dir);
 }

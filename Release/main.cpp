@@ -10,8 +10,8 @@ int main(int argc, char *argv[])
     WebServer server;
     //初始化
     server.init(config.PORT, config.user, config.passwd, config.databasename, config.LOGWrite,
-                config.LOGLevel,config.OPT_LINGER, config.TRIGMode,  config.sql_num, config.thread_num,
-                config.close_log, config.actor_model, config.sqlurl ,config.SQLPORT);
+                config.LOGLevel,config.OPT_LINGER, config.TRIGMode, config.clear_day, config.sql_num,
+                config.thread_num, config.close_log, config.actor_model, config.sqlurl ,config.SQLPORT);
 
     //日志
     server.log_write();
